@@ -1,0 +1,13 @@
+[package]
+name = "lastrun"
+version = "0.1.0"
+edition = "2024"
+description = "Record executed binaries with fanotify and report installed tools that never run"
+publish = false
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.8", features = ["derive"] }
+nix = { version = "0.32.0", features = ["fanotify", "signal", "fs", "poll"] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+serde_json = "1.0.154"

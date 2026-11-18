@@ -1,0 +1,28 @@
+[Unit]
+Description=Record executed binaries for lastrun
+# Start before ordinary services so their execs are seen from boot.
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+ExecStart=/usr/local/bin/lastrun daemon
+Restart=on-failure
+StateDirectory=lastrun
+StateDirectoryMode=0755
+UMask=0022
+Nice=10
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_DAC_READ_SEARCH
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=sysinit.target

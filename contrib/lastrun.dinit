@@ -1,0 +1,6 @@
+# Untested: written for the Artix move, not run on a dinit system yet.
+# Install as /etc/dinit.d/lastrun, then: dinitctl enable lastrun
+type = process
+command = /usr/local/bin/lastrun daemon
+restart = on-failure
+logfile = /var/log/lastrun.log
