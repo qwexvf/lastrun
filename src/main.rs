@@ -3,6 +3,7 @@ mod db;
 mod history;
 mod inventory;
 mod report;
+mod tui;
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -51,6 +52,11 @@ enum Cmd {
         #[arg(long)]
         show_used: bool,
     },
+    /// Browse the same data interactively and copy removal commands.
+    Tui {
+        #[arg(long, default_value_t = 30)]
+        days: u32,
+    },
 }
 
 fn main() -> Result<()> {
@@ -62,5 +68,6 @@ fn main() -> Result<()> {
             history::seed(&cli.db, &file, &path)
         }
         Cmd::Report { days, source, show_used } => report::run(&cli.db, days, source, show_used),
+        Cmd::Tui { days } => tui::run(&cli.db, days),
     }
 }

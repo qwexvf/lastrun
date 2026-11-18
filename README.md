@@ -39,6 +39,16 @@ Backup copies such as `*.bak` binaries are listed separately.
 
 Read the coverage line at the top. Until the daemon has run for the whole window and across a reboot, tools started only at boot or only occasionally show as unused.
 
+## TUI
+
+```sh
+lastrun tui [--days 30]
+```
+
+Same data as `report`, browsable. Tabs per source, `/` filters by name, `u` also shows used, required and library-only packages. The detail pane lists the exec paths that counted for the selected tool.
+
+`space` marks tools and `a` marks every unused one in view. `y` copies one command line for the marks (or the current row) to the clipboard with `wl-copy` and sends a `notify-send` notification. Tools of one kind share a command, such as `sudo pacman -Rns a b && mise uninstall node@22`. The TUI does not run anything.
+
 ## Testing
 
 `tests/container.sh` runs the daemon in a Docker container with `CAP_SYS_ADMIN`, watching only a tmpfs, so it needs no host root. It checks exact counts across two daemon restarts, including 10000 execs per round from 4 parallel loops. A script run counts both the script and its interpreter.

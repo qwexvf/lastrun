@@ -39,13 +39,45 @@ pub enum Owns {
     Prefix(String),
 }
 
+/// A removal command split into its fixed part and the tool argument, so several
+/// selected tools of one kind can share a single command line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Removal {
+    pub prefix: &'static str,
+    pub arg: String,
+}
+
+impl Removal {
+    fn new(prefix: &'static str, arg: &str) -> Self {
+        Removal { prefix, arg: shell_quote(arg) }
+    }
+}
+
+impl std::fmt::Display for Removal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.prefix, self.arg)
+    }
+}
+
+/// Joins removals into one line, one command per prefix, in first-seen order.
+pub fn merge_removals<'a>(rs: impl IntoIterator<Item = &'a Removal>) -> String {
+    let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+    for r in rs {
+        match groups.iter_mut().find(|(p, _)| *p == r.prefix) {
+            Some((_, args)) => args.push(&r.arg),
+            None => groups.push((r.prefix, vec![&r.arg])),
+        }
+    }
+    groups.iter().map(|(p, args)| format!("{p} {}", args.join(" "))).collect::<Vec<_>>().join(" && ")
+}
+
 pub enum Kind {
-    Removable(String),
+    Removable(Removal),
     /// Another package needs it, or it is part of the base system.
     Depended,
     /// Installs no executables, so exec tracking says nothing about it.
     NoExec,
-    Leftover(String),
+    Leftover(Removal),
 }
 
 pub struct Tool {
@@ -125,9 +157,9 @@ pub fn pacman() -> Result<Vec<Tool>> {
             } else if protected(&name) || !unrequired.contains(&name) {
                 Kind::Depended
             } else if aur {
-                Kind::Removable(format!("paru -Rns {name}"))
+                Kind::Removable(Removal::new("paru -Rns", &name))
             } else {
-                Kind::Removable(format!("sudo pacman -Rns {name}"))
+                Kind::Removable(Removal::new("sudo pacman -Rns", &name))
             };
             Tool {
                 source: if aur { Source::Aur } else { Source::Pacman },
@@ -155,7 +187,7 @@ pub fn mise() -> Result<Vec<Tool>> {
                 source: Source::Mise,
                 name: format!("{tool}@{ver}"),
                 owns: Owns::Prefix(prefix),
-                kind: Kind::Removable(format!("mise uninstall {}", shell_quote(&format!("{tool}@{ver}")))),
+                kind: Kind::Removable(Removal::new("mise uninstall", &format!("{tool}@{ver}"))),
                 note: (i["active"].as_bool() == Some(true)).then(|| "active in mise config".to_owned()),
             });
         }
@@ -185,7 +217,7 @@ pub fn cargo(home: &Path) -> Result<Vec<Tool>> {
         .into_iter()
         .map(|(name, bins)| Tool {
             source: Source::Cargo,
-            kind: Kind::Removable(format!("cargo uninstall {name}")),
+            kind: Kind::Removable(Removal::new("cargo uninstall", &name)),
             owns: Owns::Files(bins.iter().filter_map(|b| canon(&bin.join(b))).collect()),
             note: Some(format!("bins: {}", bins.join(", "))),
             name,
@@ -210,7 +242,7 @@ pub fn uv(home: &Path) -> Result<Vec<Tool>> {
         let Some(prefix) = canon(&e.path()) else { continue };
         out.push(Tool {
             source: Source::Uv,
-            kind: Kind::Removable(format!("uv tool uninstall {}", shell_quote(&name))),
+            kind: Kind::Removable(Removal::new("uv tool uninstall", &name)),
             owns: Owns::Prefix(prefix),
             note: None,
             name,
@@ -257,7 +289,7 @@ fn loose_bins(dir: &Path, source: Source, skip_names: &HashSet<String>, skip_ino
         }
         let shown = p.to_string_lossy().into_owned();
         let is_link = fs::symlink_metadata(&p).is_ok_and(|m| m.file_type().is_symlink());
-        let rm = format!("rm {}", shell_quote(&shown));
+        let rm = Removal::new("rm", &shown);
         out.push(Tool {
             source,
             kind: if is_bak(&name) { Kind::Leftover(rm) } else { Kind::Removable(rm) },
@@ -267,4 +299,19 @@ fn loose_bins(dir: &Path, source: Source, skip_names: &HashSet<String>, skip_ino
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge() {
+        let rs = [
+            Removal::new("sudo pacman -Rns", "a"),
+            Removal::new("rm", "/x y"),
+            Removal::new("sudo pacman -Rns", "b"),
+        ];
+        assert_eq!(merge_removals(&rs), "sudo pacman -Rns a b && rm '/x y'");
+    }
 }
