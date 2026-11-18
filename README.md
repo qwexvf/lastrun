@@ -39,6 +39,10 @@ Backup copies such as `*.bak` binaries are listed separately.
 
 Read the coverage line at the top. Until the daemon has run for the whole window and across a reboot, tools started only at boot or only occasionally show as unused.
 
+## Testing
+
+`tests/container.sh` runs the daemon in a Docker container with `CAP_SYS_ADMIN`, watching only a tmpfs, so it needs no host root. It checks exact counts across two daemon restarts, including 10000 execs per round from 4 parallel loops. A script run counts both the script and its interpreter.
+
 ## Limits
 
 - Execs under `/tmp`, `/run/user` and cargo `target/{debug,release}` dirs are skipped: they are build output, and cargo build scripts get a new path on every build.
