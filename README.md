@@ -6,9 +6,19 @@ A root daemon watches `FAN_OPEN_EXEC` with fanotify on the whole filesystem. Thi
 
 Only paths are stored: no arguments, no environment.
 
+## Requirements
+
+- Linux 5.0 or newer with fanotify enabled (`CONFIG_FANOTIFY`). `FAN_OPEN_EXEC` arrived in 5.0.
+- Root for the daemon. `report` and `tui` only read the database.
+- Rust 1.89 or newer (the minimum of the pinned `rusqlite`) and a C compiler, since SQLite is built from source.
+- For the inventory: whichever of `pacman`, `mise`, `cargo`, `uv` you use. Missing ones are skipped.
+- For `tui` copying: `wl-copy` (wl-clipboard) and `notify-send` (libnotify). Wayland only.
+
 ## Install
 
 ```sh
+git clone https://github.com/qwexvf/lastrun.git
+cd lastrun
 nice -n 19 cargo build --release -j 2
 sudo install -Dm755 target/release/lastrun /usr/local/bin/lastrun
 sudo install -Dm644 contrib/lastrun.service /etc/systemd/system/lastrun.service
@@ -21,6 +31,23 @@ sudo lastrun seed-history ~/.zsh_history --path "$PATH"
 
 On dinit (Artix), use `contrib/lastrun.dinit` instead. It has not been tested yet.
 
+Check that the daemon is recording:
+
+```sh
+systemctl status lastrun
+ls -l /var/lib/lastrun/usage.db
+```
+
+The database is written every flush interval, not on every exec, so give it a minute after the first start.
+
+### Uninstall
+
+```sh
+sudo systemctl disable --now lastrun
+sudo rm /etc/systemd/system/lastrun.service /usr/local/bin/lastrun
+sudo rm -r /var/lib/lastrun
+```
+
 ## Report
 
 ```sh
@@ -28,6 +55,38 @@ lastrun report                 # all sources, 30 days
 lastrun report --days 90 --source aur
 lastrun report --show-used
 ```
+
+Example, cut down to a few rows per section:
+
+```text
+Tools with no recorded use since 2026-10-21 (30 days)
+exec tracking since 2026-11-18 (1 days)
+warning: exec tracking covers less than the 30-day window. Tools run only by scripts, cron,
+or services started before lastrun can still show as unused. Services are seen after the next boot.
+shell history since 2025-09-25
+
+== pacman : 47 unused, 57 used ==
+  gimp               never               sudo pacman -Rns gimp
+  vlc                never               sudo pacman -Rns vlc
+  nano               2025-09-30 x2       sudo pacman -Rns nano
+  htop               2026-08-21 x1       sudo pacman -Rns htop
+  unused but required by other packages or base system (no command): less wget ...
+  no executables, cannot judge by exec: base linux noto-fonts ...
+
+== mise : 46 unused, 7 used ==
+  bun@1.3.12                   never               mise uninstall bun@1.3.12
+
+== cargo : 5 unused, 2 used ==
+  cargo-audit    never               cargo uninstall cargo-audit  # bins: cargo-audit
+
+== local bin : 20 unused, 6 used ==
+  mytool             never               rm /home/me/.local/bin/mytool
+
+== leftover backup binaries ==
+  mytool.0.9.1.bak  rm /home/me/.local/bin/mytool.0.9.1.bak
+```
+
+The date is the last recorded run and `x2` the number of runs, counting execs and shell history together. `never` means no run is recorded at all.
 
 Sources: pacman explicit packages, AUR packages, mise installs, `cargo install` crates, uv tools, and `~/.local/bin` / `~/go/bin`. Each unused tool gets the command that removes it. The report removes nothing.
 
