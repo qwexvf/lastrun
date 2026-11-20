@@ -117,3 +117,7 @@ Same data as `report`, browsable. Tabs per source, `/` filters by name, `u` also
 - Execs under `/tmp`, `/run/user` and cargo `target/{debug,release}` dirs are skipped: they are build output, and cargo build scripts get a new path on every build.
 - When the kernel event queue overflows, some execs are lost. The daemon logs each overflow.
 - Shared libraries are loaded with mmap, not exec, so a package that only ships libraries is reported as "no executables".
+
+## License
+
+MIT or Apache-2.0, at your option. See `LICENSE-MIT` and `LICENSE-APACHE`.
